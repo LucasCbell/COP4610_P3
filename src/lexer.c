@@ -1,7 +1,4 @@
-#include "lexer.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "common.h"
 
 char *get_input(void) {
 	char *buffer = NULL;

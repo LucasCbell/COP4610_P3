@@ -1,4 +1,4 @@
-#include <stdio.h>
+#include "common.h"
 
 void print_image_name(char* img_name) {
     printf("%s", img_name);

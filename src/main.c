@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include "common.h"
 
 int main(int argc, char* argv[]) {
@@ -63,6 +62,20 @@ int main(int argc, char* argv[]) {
         printf("SUCCESS: The file %s was opened.\n", argv[1]);
     }
     
+    // read the boot sector
+    unsigned char boot_sector[512];
+    read_boot_sector(img, boot_sector);
+
+    // debug
+    printf("Boot Sector:");
+    for(int i = 0; i < 512; i++) {
+        if(i % 16 == 0)
+            printf("\n\t");
+        // %X: print hex. %2: print two chars, %0 zeros for padding
+        printf("%02X ", boot_sector[i]);
+        fflush(stdout);
+    }
+    printf("\n");
 
     while (1) {
         // print image name "fat32.img"
