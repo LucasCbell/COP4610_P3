@@ -2,7 +2,8 @@
 
 int main(int argc, char* argv[]) {
 
-    FILE *img;
+    FILE *img;      // file ptr to img file
+    BPB bpb;
 
     if(argc == 2) {
         printf("%s\n", argv[0]);  // executable name  (./filesys)
@@ -44,9 +45,6 @@ int main(int argc, char* argv[]) {
                     - computed byte offset of FAT2
                     - computed byte offset of start of data region
                     - cluster of current working directory
-
-
-            
     */
 
     // attempt to open the .img file
@@ -65,6 +63,9 @@ int main(int argc, char* argv[]) {
     // read the boot sector
     unsigned char boot_sector[512];
     read_boot_sector(img, boot_sector);
+
+    // get information from the boot_sector
+    parse_boot_sector(&bpb, boot_sector);
 
     // debug
     printf("Boot Sector:");

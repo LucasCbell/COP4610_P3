@@ -8,3 +8,13 @@ void read_boot_sector(FILE* img, unsigned char* buf) {
         buf[i] = fgetc(img);
     }
 }
+
+BPB parse_boot_sector(BPB & b, unsigned char* boot_sector) {
+
+    // these are the important parts
+
+
+    // these are the rest just for funsies
+    
+
+}
