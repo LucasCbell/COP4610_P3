@@ -3,7 +3,14 @@
 int main(int argc, char* argv[]) {
 
     FILE *img;      // file ptr to img file
-    BPB bpb;
+    bool exit = 0;
+
+    BPB *bpb = malloc(sizeof(BPB));
+
+    if(bpb == NULL) {
+        printf("Memory allocation failed.");
+        return -1;
+    }
 
     if(argc == 2) {
         printf("%s\n", argv[0]);  // executable name  (./filesys)
@@ -65,7 +72,7 @@ int main(int argc, char* argv[]) {
     read_boot_sector(img, boot_sector);
 
     // get information from the boot_sector
-    parse_boot_sector(&bpb, boot_sector);
+    parse_boot_sector(bpb, boot_sector);
 
     // debug
     printf("Boot Sector:");
@@ -78,7 +85,7 @@ int main(int argc, char* argv[]) {
     }
     printf("\n");
 
-    while (1) {
+    while (exit == 0) {
         // print image name "fat32.img"
         print_image_name(argv[1]);
 
@@ -93,12 +100,25 @@ int main(int argc, char* argv[]) {
 		 * tokens contains substrings from input split by spaces */
 
 		char *input = get_input();
+
 		printf("whole input: %s\n", input);
 
 		tokenlist *tokens = get_tokens(input);
 		for (int i = 0; i < tokens->size; i++) {
-			printf("token %d: (%s)\n", i, tokens->items[i]);
+			printf("token %d: (%s)\n", i, tokens->items[i]); 
 		}
+
+        // exit command
+        if((strcmp(tokens->items[0], "exit") == 0) 
+                    && tokens->size == 1) {
+            exit = 1;
+        }
+
+        // info command
+        if ((strcmp(tokens->items[0], "info") == 0)
+                    && tokens->size == 1) {
+            info(bpb);
+        }
 
 		free(input);
 		free_tokens(tokens);
@@ -106,6 +126,9 @@ int main(int argc, char* argv[]) {
 
     // close img file
     fclose(img);
+
+    // free remaining memory
+    free(bpb);
 
     return 0;
 }

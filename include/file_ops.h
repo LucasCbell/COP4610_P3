@@ -55,4 +55,4 @@ typedef struct __attribute__((packed)){
 
 
 void read_boot_sector(FILE* img, unsigned char* boot_sector);
-BPB parse_boot_sector(BPB & b, unsigned char* boot_sector);
+void parse_boot_sector(BPB *b, unsigned char* boot_sector);
