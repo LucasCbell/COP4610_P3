@@ -71,3 +71,63 @@ void parse_boot_sector(BPB *b, unsigned char* boot_sector) {
     b->FSInfo = 0;          
 
 }
+
+uint32_t cluster_to_sector(BPD *b, uint32_t cluster) {
+    uint32_t first_data_sector = b->RsvdSecCnt + (b->NumFATs * b->FATSz32);
+    return first_data_sector + (cluster - 2) * b->SecPerClus;
+}
+
+void read_cluster(FILE *img, BPB *b, uint32_t cluster, unsigned char *buf) {
+    uint32_t sector = cluster_to_sector(b, cluster);
+    uint32_t byte_offset = sector * b->BytesPerSec;
+    uint32_t cluster_size = b->BytesPerSec * b->SecPerClus;
+
+    fseek(img, byte_offset, SEEK_SET);
+    fread(buf, 1, cluster_size, img);
+}
+
+void write_cluster(FILE *img, BPB *b, uint32_t cluster, unsigned char *buf) {
+    uint32_t sector = cluster_to_sector(b, cluster);
+    uint32_t byte_offset = sector * b->BytesPerSec;
+    uint32_t cluster_size = b->BytesPerSec * b->SecPerClus;
+
+    fseek(img, byte_offset, SEEK_SET);
+    fwrite(buf, 1, cluster_size, img);
+    fflush(img);
+}
+
+uint32_t read_fat_entry(FILE *img, BPB *b, uint32_t cluster) {
+    uint32_t fat_offset = b->RsvdSecCnt * b->BytesPerSec + cluster * 4;
+    uint32_t entry;
+
+    fseek(img, fat_offset, SEEK_SET);
+    fread(&entry, sizeof(uint32_t), 1, img);
+
+    return entry & 0x0FFFFFFF;
+}
+
+void write_fat_entry(FILE *img, BPB *b, uint32_t cluster, uint32_t value) {
+    uint32_t fat_offset = b->RsvdSecCnt * b->BytesPerSec + cluster * 4;
+
+    uint32_t existing;
+    fseek(img, fat_offset, SEEK_SET);
+    fread(&existing, sizeof(uint32_t), 1, img);
+
+    value = (existing & 0xF0000000) | (value & 0x0FFFFFFF);
+
+    fseek(img, fat_offset, SEEK_SET);
+    fwrite(&value, sizeof(uint32_t), 1, img);
+    fflush(img);
+}
+
+
+uint32_t find_free_cluster(FILE *img, BPB *b) {
+    uint32_t total_clusters = (b->TotSec32 - (b->RsvdSecCnt + b->NumFATs * b->FATSz32)) / b->SecPerClus;
+
+    for (uint32_t cluster = 2; cluster < total_cluster + 2; cluster++) {
+        if (read_fat_entry(img, b, cluster) == 0) {
+            return cluster;
+        }
+    }
+    return 0;
+}
