@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdio.h>
+#include <stdint.h>
 
 typedef struct __attribute__((packed)){
     // these are taken from the Boot Sector section of the
@@ -52,6 +53,14 @@ typedef struct __attribute__((packed)){
     // byes 510 and 511 contain "0xAA55"
     // BPB is 90 bytes long
 } BPB;
+
+//Helper funcs
+uint32_t cluster_to_sector(BPB *b, uint32_t cluster);
+void read_cluster(FILE *img, BPB *b, uint32_t cluster, unsigned char *buf);
+void write_cluster(FILE *img, BPB *b, uint32_t cluster, unsigned char *buf);
+uint32_t read_fat_entry(FILE *img, BPB *b, uint32_t cluster);
+void write_fat_entry(FILE *img, BPB, *b, uint32_t cluster, uint32_t value);
+uint32_t find_free_cluster(FILE, *img, BPB *b);
 
 
 void read_boot_sector(FILE* img, unsigned char* boot_sector);
