@@ -53,6 +53,38 @@ typedef struct __attribute__((packed)){
     // BPB is 90 bytes long
 } BPB;
 
+typedef struct __attribute__((packed)) {
+    unsigned char name[11];         // 8.3 filename format (8 chars + 3 extension)
+    unsigned char attr;             // file attributes (bit 4 = directory)
+    unsigned char ntres;            // reserved for use by Windows NT
+    unsigned char crttimetenth;     // creation time (tenths of a second)
+    unsigned short crttime;         // ceation time
+    unsigned short crtdate;         // creation date
+    unsigned short lstaccdate;      // last access date
+    unsigned short fstclushi;       // high word of first cluster (FAT32)
+    unsigned short wrttime;         // last write time
+    unsigned short wrtdate;         // last write date
+    unsigned short fstcluslo;       // low word of first cluster
+    unsigned int filesize;          // file size in bytes
+} dir_entry;
+
+// dir entry attribute bits
+#define ATTR_READ_ONLY  0x01
+#define ATTR_HIDDEN     0x02
+#define ATTR_SYSTEM     0x04
+#define ATTR_VOLUME_ID  0x08
+#define ATTR_DIRECTORY  0x10
+#define ATTR_ARCHIVE    0x20
+#define ATTR_LONG_NAME  0x0F
 
 void read_boot_sector(FILE* img, unsigned char* boot_sector);
 void parse_boot_sector(BPB *b, unsigned char* boot_sector);
+dir_entry* read_dir(FILE* img, BPB *b, unsigned int cluster, int *entry_count);
+dir_entry* read_dir_chain(FILE* img, BPB *b, unsigned int cluster, int *entry_count);
+unsigned int get_cluster_offset(BPB *b, unsigned int cluster);
+unsigned int get_next_cluster(FILE* img, BPB *b, unsigned int cluster);
+dir_entry* find_entry_in_cluster(FILE* img, BPB *b, unsigned int cluster, char* name);
+unsigned int get_root_cluster(BPB *b);
+int is_directory(dir_entry *entry);
+int is_longname(dir_entry *entry);
+char* trim_filename(char *filename, int name_len);

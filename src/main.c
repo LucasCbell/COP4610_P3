@@ -4,6 +4,7 @@ int main(int argc, char* argv[]) {
 
     FILE *img;      // file ptr to img file
     bool exit = 0;
+    unsigned int current_cluster;  // track current working dir cluster
 
     BPB *bpb = malloc(sizeof(BPB));
 
@@ -74,17 +75,13 @@ int main(int argc, char* argv[]) {
     // get information from the boot_sector
     parse_boot_sector(bpb, boot_sector);
 
-    // debug
-    printf("Boot Sector:");
-    for(int i = 0; i < 512; i++) {
-        if(i % 16 == 0)
-            printf("\n\t");
-        // %X: print hex. %2: print two chars, %0 zeros for padding
-        printf("%02X ", boot_sector[i]);
-        fflush(stdout);
-    }
-    printf("\n");
+    // initialize current dir to root cluster
+    current_cluster = bpb->RootClus;
+    
+    // initialize path tracking
+    init_path();
 
+    // main shell loop
     while (exit == 0) {
         // print image name "fat32.img"
         print_image_name(argv[1]);
@@ -92,7 +89,8 @@ int main(int argc, char* argv[]) {
         // print path in image
         // "/" for root
         // "/FOLDER1/FOLDER2/"
-        print_path();
+        extern char current_path[256];
+        print_path(current_path);
 
 		printf("> ");
 
@@ -101,12 +99,7 @@ int main(int argc, char* argv[]) {
 
 		char *input = get_input();
 
-		printf("whole input: %s\n", input);
-
 		tokenlist *tokens = get_tokens(input);
-		for (int i = 0; i < tokens->size; i++) {
-			printf("token %d: (%s)\n", i, tokens->items[i]); 
-		}
 
         // exit command
         if((strcmp(tokens->items[0], "exit") == 0) 
@@ -118,6 +111,22 @@ int main(int argc, char* argv[]) {
         if ((strcmp(tokens->items[0], "info") == 0)
                     && tokens->size == 1) {
             info(bpb);
+        }
+
+        // ls command
+        if ((strcmp(tokens->items[0], "ls") == 0)
+                    && tokens->size == 1) {
+            ls(img, bpb, current_cluster);
+        }
+
+        // cd command
+        if ((strcmp(tokens->items[0], "cd") == 0)
+                    && tokens->size == 2) {
+            unsigned int new_cluster = cd(img, bpb, current_cluster, tokens->items[1]);
+            if (new_cluster != 0) {
+                current_cluster = new_cluster;
+                update_path(tokens->items[1], 1);
+            }
         }
 
 		free(input);
