@@ -1,4 +1,5 @@
 #include "common.h"
+file_table table[10];
 
 int main(int argc, char* argv[]) {
 
@@ -7,6 +8,14 @@ int main(int argc, char* argv[]) {
     unsigned int current_cluster;  // track current working dir cluster
 
     BPB *bpb = malloc(sizeof(BPB));
+
+    //initialzing the file table empty
+    for (int i = 0; i < 10; i++) {
+        table[i].isopen = 0;
+        table[i].index = i;
+        memset(table[i].filename, 0, 256);
+        memset(table[i].path, 0, 512);
+    }
 
     if(bpb == NULL) {
         printf("Memory allocation failed.");
@@ -108,26 +117,45 @@ int main(int argc, char* argv[]) {
         }
 
         // info command
-        if ((strcmp(tokens->items[0], "info") == 0)
-                    && tokens->size == 1) {
+        if ((strcmp(tokens->items[0], "info") == 0) && tokens->size == 1) {
             info(bpb);
         }
 
         // ls command
-        if ((strcmp(tokens->items[0], "ls") == 0)
-                    && tokens->size == 1) {
+        if ((strcmp(tokens->items[0], "ls") == 0) && tokens->size == 1) {
             ls(img, bpb, current_cluster);
         }
 
         // cd command
-        if ((strcmp(tokens->items[0], "cd") == 0)
-                    && tokens->size == 2) {
+        if ((strcmp(tokens->items[0], "cd") == 0) && tokens->size == 2) {
             unsigned int new_cluster = cd(img, bpb, current_cluster, tokens->items[1]);
             if (new_cluster != 0) {
                 current_cluster = new_cluster;
                 update_path(tokens->items[1], 1);
             }
         }
+
+        // open command
+        if ((strcmp(tokens->items[0], "open") == 0) && tokens->size == 3) {
+            open(tokens->items[1], tokens->items[2], img, bpb, current_cluster, table);
+        }
+        if ((strcmp(tokens->items[0], "close") == 0) && tokens->size == 2) {
+            close(tokens->items[1], table);
+        }
+        
+        if ((strcmp(tokens->items[0], "lsof") == 0) && tokens->size == 1) {
+            lsof(table);
+        }
+        
+        if ((strcmp(tokens->items[0], "lseek") == 0) && tokens->size == 3) {
+            int offset = atoi(tokens->items[2]);
+            lseek(tokens->items[1], offset, table);
+        }
+        /*
+        if ((strcmp(tokens->items[0], "read") == 0) && tokens->size == 3) {
+            read(tokens->items[1], size, img, bpb, table);
+        }
+        */
 
 		free(input);
 		free_tokens(tokens);

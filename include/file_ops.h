@@ -77,6 +77,19 @@ typedef struct __attribute__((packed)) {
 #define ATTR_ARCHIVE    0x20
 #define ATTR_LONG_NAME  0x0F
 
+typedef struct{
+    char filename[256];         // name of file
+    char mode;                  // what command 'r', 'w', 'rw', 'wr'
+    int offset;                 // current position in file
+    FILE *fp;                   // file pointer when open()
+    char path[512];             // abs path to file
+    int index;                  // index in the data structure
+    int filesize;               // size of file
+    int isopen;                 // 1 for open 0 for closed
+} file_table;
+
+extern file_table table[10];
+
 void read_boot_sector(FILE* img, unsigned char* boot_sector);
 void parse_boot_sector(BPB *b, unsigned char* boot_sector);
 dir_entry* read_dir(FILE* img, BPB *b, unsigned int cluster, int *entry_count);

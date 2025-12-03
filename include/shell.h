@@ -1,5 +1,7 @@
 #pragma once
 
+extern char current_path[256];
+
 void print_image_name(char* img_name);
 void print_path(char* current_path);
 void init_path(void);

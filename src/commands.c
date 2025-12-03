@@ -1,4 +1,5 @@
 #include "common.h"
+#include "shell.h"
 
 void info(BPB * b) {
     printf("%-12s %-12d\n", "BytesPerSec:",  b->BytesPerSec);
@@ -106,4 +107,187 @@ unsigned int cd(FILE* img, BPB* b, unsigned int current_cluster, char* dirname) 
     printf("ERROR: %s does not exist.\n", dirname);
     free(entries);
     return 0;
+}
+
+void open(char* filename, char* flags, FILE* img, BPB* b, unsigned int current_cluster, file_table* table){
+
+    // check for invalid flag input
+    if (strcmp(flags, "-r") != 0 && strcmp(flags, "-w") != 0 && 
+        strcmp(flags, "-wr") != 0 && strcmp(flags, "-rw") != 0) {
+
+        printf("Error: invalid flags\n");
+        return;
+    }
+    // check if file is open in filetable
+    for(int i = 0; i < 10; i++){
+        if(table[i].isopen == 1 && strcmp(table[i].filename, filename) == 0){
+            printf("Error, file already open");
+            return;
+        }
+    }
+    int entry_count = 0;
+    dir_entry* temp_entry = read_dir_chain(img, b, current_cluster, &entry_count);
+    if(temp_entry == NULL){ 
+        printf("Error: cannot read directory\n");
+        return; 
+    }
+    dir_entry* entry = NULL;
+    for (int i = 0; i < entry_count; i++) {
+        if (is_longname(&temp_entry[i])) {
+            continue;
+        }
+        char* trimmed = trim_filename((char*)temp_entry[i].name, 11);
+        if (strcmp(trimmed, filename) == 0) {
+            entry = &temp_entry[i];
+            free(trimmed);
+            break;
+        }
+        free(trimmed);
+    }
+
+    if (entry == NULL){
+        printf("File doesnt exist\n");
+        free(temp_entry);
+        return;
+    }
+
+     // check if its a dir
+    if(is_directory(entry)){
+        printf("Error: %s is a directory\n", filename);
+        free(entry);
+        return;
+    }
+    // finding lowest file index then populating it
+    int index = -1; 
+    for(int i = 0; i < 10; i++){
+        if(table[i].isopen == 0){
+            index = i;
+            break;
+        }
+    }
+    if(index == -1) {
+        printf("Error, no more file space");
+        return;
+    }
+    strcpy(table[index].filename, filename);
+    char path[512];
+    strcpy(path, current_path);
+    strcat(path, "/");
+    strcat(path, filename);
+    strcpy(table[index].path, path);
+
+    if(strcmp(flags, "-r") == 0){
+        table[index].mode = 'r';
+    } else if(strcmp(flags, "-w") == 0){
+        table[index].mode = 'w';
+    }else{
+         table[index].mode = 'a';           //a if its both 
+    }
+
+    table[index].offset = 0;
+    table[index].filesize = entry->filesize;
+    table[index].fp = img;
+    table[index].index = index;
+    table[index].isopen = 1;
+    
+    printf("Opened \n");
+    free(temp_entry);
+
+}
+
+void close(char* filename, file_table* table){
+
+    int index = -1;
+    for(int i = 0; i < 10; i++){
+        if(table[i].isopen == 1 && strcmp(table[i].filename, filename) == 0){
+            index = i;
+            break;
+        }
+    }
+    if (index == -1){
+        printf("Error: file doesn't exist or not open");
+        return;
+    }
+
+    memset(table[index].filename, 0 , 256);
+    memset(table[index].path, 0 , 512);
+    table[index].mode = 0;
+    table[index].offset = 0;
+    table[index].filesize = 0;
+    table[index].fp = NULL;
+    table[index].index = index;
+    table[index].isopen = 0;
+
+    printf("Closed \n");
+}
+
+void lsof(file_table* table){
+
+    int found = 0;
+
+    for(int i = 0; i < 10; i++){
+        if(table[i].isopen == 1){
+            found = 1;
+            break;
+        }
+    }
+
+    if(!found){
+        printf("No files are opened\n");
+        return;
+    }
+
+    printf("INDEX\tFILENAME\tMODE\tOFFSET\tPATH\n");
+    printf("-----\t--------\t----\t------\t----\n");
+
+    for (int i = 0; i < 10; i++) {
+        if (table[i].isopen == 1) {
+            char mode_str[5];
+            if (table[i].mode == 'r') {
+                strcpy(mode_str, "-r");
+            } else if (table[i].mode == 'w') {
+                strcpy(mode_str, "-w");
+            } else {
+                strcpy(mode_str, "-rw");
+            }
+            
+            printf("%d\t%s\t%s\t%d\t%s\n", 
+                   table[i].index, 
+                   table[i].filename, 
+                   mode_str, 
+                   table[i].offset, 
+                   table[i].path);
+        }
+    }
+}
+
+void lseek(char* filename, int offset, file_table* table) {
+    
+    int index = -1;
+    for(int i = 0; i < 10; i++){
+        if(table[i].isopen == 1 && strcmp(table[i].filename, filename) == 0){
+            index = i;
+            break;
+        }
+    }
+    if(index == -1){
+        printf("Error: file doesnt exist or not opened\n");
+        return;
+    }
+
+    if(offset > table[index].filesize) {
+        printf("Error: offset larger than file size\n");
+        table[index].offset = table[index].filesize;
+        return;
+    }
+    if(offset < 0){
+        printf("Error: offset cannot be negative\n");
+        return;
+    }
+
+    table[index].offset = offset;
+}
+
+void read(char* filename, int size, FILE* img, BPB* b, file_table* table, unsigned int current_cluster){
+
 }
