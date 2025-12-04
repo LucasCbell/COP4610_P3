@@ -109,7 +109,7 @@ unsigned int cd(FILE* img, BPB* b, unsigned int current_cluster, char* dirname) 
     return 0;
 }
 
-void open(char* filename, char* flags, FILE* img, BPB* b, unsigned int current_cluster, file_table* table){
+void open(char* filename, char* flags, FILE* img, BPB* b, unsigned int current_cluster, file_table* table, char* img_name){
 
     // check for invalid flag input
     if (strcmp(flags, "-r") != 0 && strcmp(flags, "-w") != 0 && 
@@ -171,9 +171,12 @@ void open(char* filename, char* flags, FILE* img, BPB* b, unsigned int current_c
     }
     strcpy(table[index].filename, filename);
     char path[512];
-    strcpy(path, current_path);
-    strcat(path, "/");
-    strcat(path, filename);
+    strcpy(path, img_name);
+    strcat(path, current_path);
+    int path_len = strlen(path);
+    if(path_len > 0 && path[path_len - 1] == '/'){
+        path[path_len - 1] = '\0';
+    }
     strcpy(table[index].path, path);
 
     if(strcmp(flags, "-r") == 0){
@@ -237,8 +240,8 @@ void lsof(file_table* table){
         return;
     }
 
-    printf("INDEX\tFILENAME\tMODE\tOFFSET\tPATH\n");
-    printf("-----\t--------\t----\t------\t----\n");
+    printf("%-6s %-12s %-6s %-8s %s\n", "INDEX", "FILENAME", "MODE", "OFFSET", "PATH");
+    printf("%-6s %-12s %-6s %-8s %s\n", "-----", "--------", "----", "------", "----");
 
     for (int i = 0; i < 10; i++) {
         if (table[i].isopen == 1) {
@@ -251,7 +254,7 @@ void lsof(file_table* table){
                 strcpy(mode_str, "-rw");
             }
             
-            printf("%d\t%s\t%s\t%d\t%s\n", 
+            printf("%-6d %-12s %-6s %-8d %s\n", 
                    table[i].index, 
                    table[i].filename, 
                    mode_str, 
@@ -289,5 +292,129 @@ void lseek(char* filename, int offset, file_table* table) {
 }
 
 void read(char* filename, int size, FILE* img, BPB* b, file_table* table, unsigned int current_cluster){
-
+    
+    // find file in table and check if opened for reading
+    int index = -1;
+    for(int i = 0; i < 10; i++){
+        if(table[i].isopen == 1 && strcmp(table[i].filename, filename) == 0){
+            index = i;
+            break;
+        }
+    }
+    
+    if(index == -1){
+        printf("Error: file does not exist or is not open\n");
+        return;
+    }
+    
+    // check if file is opened for reading
+    if(table[index].mode != 'r' && table[index].mode != 'a'){
+        printf("Error: file is not open for reading\n");
+        return;
+    }
+    
+    // get file info from table
+    int offset = table[index].offset;
+    int filesize = table[index].filesize;
+    
+    // check if already at end of file
+    if(offset >= filesize){
+        printf("Error: already at end of file\n");
+        return;
+    }
+    
+    // calculate how many bytes to actually read
+    int bytes_to_read = size;
+    if(offset + size > filesize){
+        bytes_to_read = filesize - offset;
+    }
+    
+    // find the file's first cluster from directory
+    int entry_count = 0;
+    dir_entry* entries = read_dir_chain(img, b, current_cluster, &entry_count);
+    if(entries == NULL){
+        printf("Error: could not read directory\n");
+        return;
+    }
+    
+    dir_entry* file_entry = NULL;
+    for(int i = 0; i < entry_count; i++){
+        if(is_longname(&entries[i])) continue;
+        char* trimmed = trim_filename((char*)entries[i].name, 11);
+        if(strcmp(trimmed, filename) == 0){
+            file_entry = &entries[i];
+            free(trimmed);
+            break;
+        }
+        free(trimmed);
+    }
+    
+    if(file_entry == NULL){
+        printf("Error: file not found in directory\n");
+        free(entries);
+        return;
+    }
+    
+    // get files first cluster
+    unsigned int file_cluster = (file_entry->fstclushi << 16) | file_entry->fstcluslo;
+    
+    // calc cluster size
+    unsigned int cluster_size = b->BytesPerSec * b->SecPerClus;
+    
+    // navigate to the cluster containing the offset
+    unsigned int cluster_offset = offset;  // offset within current cluster
+    unsigned int current_file_cluster = file_cluster;
+    
+    // skip clusters until we reach the one containing our offset
+    while(cluster_offset >= cluster_size){
+        current_file_cluster = get_next_cluster(img, b, current_file_cluster);
+        if(current_file_cluster >= 0x0FFFFFF8){
+            printf("Error: offset beyond file data\n");
+            free(entries);
+            return;
+        }
+        cluster_offset -= cluster_size;
+    }
+    
+    // read and print the data
+    int bytes_read = 0;
+    unsigned char* buffer = malloc(bytes_to_read + 1);
+    if(buffer == NULL){
+        printf("Error: memory allocation failed\n");
+        free(entries);
+        return;
+    }
+    
+    while(bytes_read < bytes_to_read && current_file_cluster < 0x0FFFFFF8){
+        // calc position in image file
+        unsigned int cluster_start = get_cluster_offset(b, current_file_cluster);
+        
+        // how many bytes to read from this cluster
+        unsigned int bytes_in_cluster = cluster_size - cluster_offset;
+        if(bytes_in_cluster > (unsigned int)(bytes_to_read - bytes_read)){
+            bytes_in_cluster = bytes_to_read - bytes_read;
+        }
+        
+        // seek to position and read
+        fseek(img, cluster_start + cluster_offset, SEEK_SET);
+        fread(buffer + bytes_read, 1, bytes_in_cluster, img);
+        
+        bytes_read += bytes_in_cluster;
+        cluster_offset = 0;  // subsequent clusters start at offset 0
+        
+        // move to next cluster if needed
+        if(bytes_read < bytes_to_read){
+            current_file_cluster = get_next_cluster(img, b, current_file_cluster);
+        }
+    }
+    
+    // null-terminate and print
+    buffer[bytes_read] = '\0';
+    printf("%s\n", buffer);
+    
+    // update the file offset
+    table[index].offset = offset + bytes_read;
+    
+    free(buffer);
+    free(entries);
 }

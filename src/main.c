@@ -137,7 +137,7 @@ int main(int argc, char* argv[]) {
 
         // open command
         if ((strcmp(tokens->items[0], "open") == 0) && tokens->size == 3) {
-            open(tokens->items[1], tokens->items[2], img, bpb, current_cluster, table);
+            open(tokens->items[1], tokens->items[2], img, bpb, current_cluster, table, argv[1]);
         }
         if ((strcmp(tokens->items[0], "close") == 0) && tokens->size == 2) {
             close(tokens->items[1], table);
@@ -151,11 +151,12 @@ int main(int argc, char* argv[]) {
             int offset = atoi(tokens->items[2]);
             lseek(tokens->items[1], offset, table);
         }
-        /*
+        
         if ((strcmp(tokens->items[0], "read") == 0) && tokens->size == 3) {
-            read(tokens->items[1], size, img, bpb, table);
+            int size = atoi(tokens->items[2]);
+            read(tokens->items[1], size, img, bpb, table, current_cluster);
         }
-        */
+        
 
 		free(input);
 		free_tokens(tokens);
